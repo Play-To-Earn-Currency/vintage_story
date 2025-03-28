@@ -1,0 +1,11 @@
+{
+    "millisecondsPerTick": 5000,
+    "earnByPlaying": true,
+    "coinsPerSecond": 277777800000000,
+    "databaseName": "pte_wallets",
+    "databaseTable": "vintagestory",
+    "databaseUsername": "pte_admin",
+    "databasePassword": "supersecretpassword",
+    "databaseAddress": "localhost",
+    "enableExtendedLog": false
+}
