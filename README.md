@@ -7,7 +7,7 @@ Base template for creating a vintage story compatibility with PTE coin
 
 ### Dependencies
 - [AFKModule](https://mods.vintagestory.at/afkmodule)
-- [Mysql Database](https://www.mysql.com/)
+- [PTE Database Server](https://github.com/Play-To-Earn-Currency/pte_databaseserver)
 
 # Using
 - Install a database like mysql or mariadb
@@ -21,16 +21,10 @@ CREATE TABLE vintagestory (
 );
 ```
 - Put this mod on your server, [reference](https://wiki.vintagestory.at/Adding_mods)
-- Starts the server at least one time
-- Go to DataPath from your vintage story server, find ModConfig and change the PlayToEarn configurations for you desired database
+- Setup [PTE Database Server](https://github.com/Play-To-Earn-Currency/pte_databaseserver)
+- Start the server once to generate configurations
+- Go to DataPath from your vintage story server, find ModConfig and change the PlayToEarn necessary configurations
 - Restart the server and everthing should be running
-
-# About VS Play To Earn
-VS Play To Earn is open source project and can easily be accessed on the github, all contents from this mod is completly free.
-
-If you want to contribute into the project you can access the project github and make your pull request.
-
-You are free to fork the project and make your own version of VS Play To Earn, as long the name is changed.
 
 # Building
 - Install .NET in your system, open terminal type: ``dotnet new install VintageStory.Mod.Templates``
@@ -39,5 +33,3 @@ You are free to fork the project and make your own version of VS Play To Earn, a
 - Copy the ``CakeBuild`` and ``build.ps1`` or ``build.sh`` and paste inside the repository
 
 Now you can build using the ``build.ps1`` or ``build.sh`` file
-
-FTM License

@@ -1,15 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <OutputPath>bin\$(Configuration)\Mods\mod</OutputPath>
     <LangVersion>12</LangVersion>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="MySqlConnector" Version="2.2.0" />
-  </ItemGroup>
 
   <ItemGroup>
     <Reference Include="VintagestoryAPI">
@@ -55,7 +51,7 @@
 
   <ItemGroup>
     <Reference Include="AFKModule">
-        <HintPath>$(VINTAGE_STORY)/Mods/afkmodule/AFKModule.dll</HintPath>
+        <HintPath>$(VINTAGE_STORY_MODS)/afkmodule/AFKModule.dll</HintPath>
         <Private>false</Private>
     </Reference>
   </ItemGroup>

@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Net.Http;
 using System.Numerics;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using AFKModule.Modules;
-using MySqlConnector;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.Server;
 
 namespace PlayToEarn;
@@ -29,8 +29,6 @@ public partial class PlayToEarnModSystem : ModSystem
     /// </summary>
     public static readonly Dictionary<string, bool> playersWalletsStatus = [];
 
-    private static MySqlConnection walletsDatabase;
-
     public override void AssetsLoaded(ICoreAPI api)
     {
         base.AssetsLoaded(api);
@@ -41,10 +39,6 @@ public partial class PlayToEarnModSystem : ModSystem
     public override void StartServerSide(ICoreServerAPI api)
     {
         base.StartServerSide(api);
-
-        walletsDatabase = new MySqlConnection(
-            $"Server={Configuration.databaseAddress};Database={Configuration.databaseName};User={Configuration.databaseUsername};Password={Configuration.databasePassword};"
-        );
 
         api.Event.RegisterGameTickListener(OnTick, Configuration.millisecondsPerTick);
 
@@ -68,65 +62,74 @@ public partial class PlayToEarnModSystem : ModSystem
     #region commands
     private TextCommandResult ViewBalance(TextCommandCallingArgs args)
     {
-        IPlayer player = args.Caller.Player;
+        IServerPlayer player = args.Caller.Player as IServerPlayer;
         string statusText;
-        if (Events.playersSoftAfk.Contains(player.PlayerUID)) statusText = ", YOU ARE NOT EARNING PTE";
+        if (AFKModule.Modules.Events.playersSoftAfk.Contains(player.PlayerUID)) statusText = ", YOU ARE NOT EARNING PTE";
         else statusText = ", Currently earning PTE";
 
-        walletsDatabase.Open();
-        using MySqlCommand databaseCommand = new("SELECT value FROM vintagestory WHERE uniqueid = @playerUID", walletsDatabase);
-        databaseCommand.Parameters.AddWithValue("@playerUID", player.PlayerUID);
-        using MySqlDataReader reader = databaseCommand.ExecuteReader();
-        if (reader.HasRows)
-            while (reader.Read())
-            {
-                decimal value = reader.GetDecimal("value");
-                walletsDatabase.Close();
-                return TextCommandResult.Success($"PTE: {Configuration.FormatCoinToHumanReadable(value.ToString())}{statusText}", "3");
-            }
-        else
+        Task.Run(async () =>
         {
-            walletsDatabase.Close();
-            return TextCommandResult.Error($"You don't have any wallet set up", "4");
-        };
-        walletsDatabase.Close();
-        return TextCommandResult.Error($"You don't have any balance", "5");
+            try
+            {
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Add("from", Configuration.httpFrom);
+                var response = await client.GetAsync($"http://{Configuration.httpIp}/getbalance?uniqueid={player.PlayerUID}");
+                response.EnsureSuccessStatusCode();
+
+                var content = await response.Content.ReadAsStringAsync();
+                player.SendMessage(GlobalConstants.GeneralChatGroup, $"PTE: {content}{statusText}", EnumChatType.Notification);
+            }
+            catch (HttpRequestException ex)
+            {
+                if (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    player.SendMessage(GlobalConstants.GeneralChatGroup, "You don't have any wallet set up", EnumChatType.CommandError);
+                }
+                else
+                {
+                    player.SendMessage(GlobalConstants.GeneralChatGroup, $"Failed to get balance, error code: {ex.StatusCode}", EnumChatType.CommandError);
+                }
+            }
+        });
+
+        return TextCommandResult.Success();
     }
 
     private TextCommandResult SetWalletAddress(TextCommandCallingArgs args)
     {
         if (args[0] == null) return TextCommandResult.Error($"No wallet provided", "5");
 
-        IPlayer player = args.Caller.Player;
+        IServerPlayer player = args.Caller.Player as IServerPlayer;
         string address = args[0].ToString();
 
         if (!Validator.ValidAddress(address))
             return TextCommandResult.Error($"Invalid wallet", "1");
 
-        // Update if exist
+        Task.Run(async () =>
         {
-            walletsDatabase.Open();
-            using MySqlCommand databaseCommand = new("UPDATE vintagestory SET walletaddress = @address WHERE uniqueid = @playerUID", walletsDatabase);
-            databaseCommand.Parameters.AddWithValue("@address", address);
-            databaseCommand.Parameters.AddWithValue("@playerUID", player.PlayerUID);
+            try
+            {
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Add("from", Configuration.httpFrom);
+                var body = new
+                {
+                    uniqueid = player.PlayerUID,
+                    wallet = address,
+                };
+                var json = System.Text.Json.JsonSerializer.Serialize(body);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                var response = await client.PutAsync($"http://{Configuration.httpIp}/updatewallet", content);
+                response.EnsureSuccessStatusCode();
 
-            int rowsAffected = databaseCommand.ExecuteNonQuery();
-            walletsDatabase.Close();
-            if (rowsAffected > 0) return TextCommandResult.Success($"Wallet Set!", "2");
-        }
+                player.SendMessage(GlobalConstants.GeneralChatGroup, "Success changing the wallet", EnumChatType.Notification);
+            }
+            catch (HttpRequestException ex)
+            {
+                player.SendMessage(GlobalConstants.GeneralChatGroup, $"Failed to set wallet, error code: {ex.StatusCode}", EnumChatType.CommandError);
+            }
+        });
 
-        // Create if not exist
-        {
-            walletsDatabase.Open();
-            using MySqlCommand databaseCommand = new("INSERT INTO vintagestory (walletaddress, uniqueid) VALUES (@address, @playerUID)", walletsDatabase);
-            databaseCommand.Parameters.AddWithValue("@address", address);
-            databaseCommand.Parameters.AddWithValue("@playerUID", player.PlayerUID);
-
-            int rowsAffected = databaseCommand.ExecuteNonQuery();
-            walletsDatabase.Close();
-            if (rowsAffected > 0) return TextCommandResult.Success($"Wallet Set!", "2");
-            else return TextCommandResult.Error($"Cannot set your wallet, contact the administrator", "4");
-        }
+        return TextCommandResult.Success();
     }
     #endregion
 
@@ -156,28 +159,41 @@ public partial class PlayToEarnModSystem : ModSystem
                 foreach (IServerPlayer player in onlinePlayers)
                 {
                     // Afk players
-                    if (Events.playersSoftAfk.Contains(player.PlayerUID))
+                    if (AFKModule.Modules.Events.playersSoftAfk.Contains(player.PlayerUID))
                     {
                         if (Configuration.enableExtendedLog)
                             Debug.Log("Ignoring " + player.PlayerName + " because he is afk");
                         continue;
                     }
 
-                    walletsDatabase.Open();
-                    using MySqlCommand databaseCommand = new("UPDATE vintagestory SET value = value + @additionalCoins WHERE uniqueid = @playerUID", walletsDatabase);
-                    databaseCommand.Parameters.AddWithValue("@additionalCoins", additionalCoins);
-                    databaseCommand.Parameters.AddWithValue("@playerUID", player.PlayerUID);
+                    Task.Run(async () =>
+                    {
+                        try
+                        {
+                            using var client = new HttpClient();
+                            client.DefaultRequestHeaders.Add("from", Configuration.httpFrom);
+                            var body = new
+                            {
+                                uniqueid = player.PlayerUID,
+                                quantity = additionalCoins.ToString(),
+                            };
+                            var json = System.Text.Json.JsonSerializer.Serialize(body);
+                            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                            var response = await client.PutAsync($"http://{Configuration.httpIp}/increment", content);
+                            response.EnsureSuccessStatusCode();
 
-                    int rowsAffected = databaseCommand.ExecuteNonQuery();
-                    walletsDatabase.Close();
-                    if (Configuration.enableExtendedLog)
-                        if (rowsAffected > 0) Debug.Log($"{player.PlayerName} received: {Configuration.FormatCoinToHumanReadable(additionalCoins)} PTE");
-                        else Debug.Log($"{player.PlayerName} does not have a wallet setup");
+                            Debug.LogDebug($"{player.PlayerName} received: {Configuration.FormatCoinToHumanReadable(additionalCoins)} PTE");
+                        }
+                        catch (HttpRequestException ex)
+                        {
+                            Debug.LogDebug($"{player.PlayerName} cannot increment because: {ex.StatusCode}");
+                        }
+                    });
                 }
             }
             catch (Exception ex)
             {
-                Debug.Log($"ERROR: Cannot increment wallet values, reason: {ex.Message}");
+                Debug.LogError($"ERROR: Cannot increment wallet values, reason: {ex.Message}");
             }
         });
     }
@@ -188,41 +204,20 @@ public partial class PlayToEarnModSystem : ModSystem
     {
         onlinePlayers.Add(byPlayer);
 
-        while (true)
+        try
         {
-            try
+            using var client = new HttpClient();
+            client.DefaultRequestHeaders.Add("from", Configuration.httpFrom);
+            var body = new
             {
-                walletsDatabase.Open();
-                MySqlCommand databaseCommand = new("SELECT COUNT(*) FROM vintagestory WHERE uniqueid = @playerUID", walletsDatabase);
-                databaseCommand.Parameters.AddWithValue("@playerUID", byPlayer.PlayerUID);
-
-                int count = Convert.ToInt32(databaseCommand.ExecuteScalar());
-
-                // Check if player is already registered
-                if (count == 0)
-                {
-                    // In this case is not registered, so we will pre register the player
-                    databaseCommand = new("INSERT INTO vintagestory (uniqueid) VALUES (@playerUID)", walletsDatabase);
-                    databaseCommand.Parameters.AddWithValue("@playerUID", byPlayer.PlayerUID);
-
-                    int rowsAffected = databaseCommand.ExecuteNonQuery();
-                    if (rowsAffected == 0) Debug.Log($"ERROR: Cannot pre register player {byPlayer.PlayerName} for some reason");
-                }
-                walletsDatabase.Close();
-                break;
-            }
-            catch (Exception ex)
-            {
-                walletsDatabase.Close();
-                if (byPlayer.ConnectionState == EnumClientState.Connected ||
-                    byPlayer.ConnectionState == EnumClientState.Playing)
-                {
-                    Debug.Log($"ERROR: cannot register {byPlayer.PlayerName}, reason: {ex.Message}");
-                    await Task.Delay(1000);
-                }
-                else break;
-            }
+                uniqueid = byPlayer.PlayerUID
+            };
+            var json = System.Text.Json.JsonSerializer.Serialize(body);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            var response = await client.PostAsync($"http://{Configuration.httpIp}/register", content);
+            response.EnsureSuccessStatusCode();
         }
+        catch (Exception) { }
     }
     private void PlayerDisconnect(IServerPlayer byPlayer)
     {
@@ -230,11 +225,27 @@ public partial class PlayToEarnModSystem : ModSystem
     }
     #endregion
 
-    static public class Debug
+    public class Debug
     {
-        static private ILogger _logger;
-        static public void LoadLogger(ILogger logger) => _logger = logger;
+        static private ILogger logger;
+
+        static public void LoadLogger(ILogger _logger) => logger = _logger;
         static public void Log(string message)
-            => _logger?.Log(EnumLogType.Debug, $"[PlayToEarn] {message}");
+        {
+            logger?.Log(EnumLogType.Notification, $"[LevelUP] {message}");
+        }
+        static public void LogDebug(string message)
+        {
+            if (Configuration.enableExtendedLog)
+                logger?.Log(EnumLogType.Debug, $"[LevelUP] {message}");
+        }
+        static public void LogWarn(string message)
+        {
+            logger?.Log(EnumLogType.Warning, $"[LevelUP] {message}");
+        }
+        static public void LogError(string message)
+        {
+            logger?.Log(EnumLogType.Error, $"[LevelUP] {message}");
+        }
     }
 }

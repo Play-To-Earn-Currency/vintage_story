@@ -82,15 +82,11 @@ public static class Configuration
     #region baseconfigs
     public static int millisecondsPerTick = 5000;
     #region Gameplay Earn
-    public static bool earnByPlaying = true;
     public static BigInteger coinsPerSecond = 277777800000000;
     #endregion
 
-    public static string databaseName = "pte_wallets";
-    public static string databaseTable = "vintagestory";
-    public static string databaseUsername = "pte_admin";
-    public static string databasePassword = "supersecretpassword";
-    public static string databaseAddress = "localhost";
+    public static string httpIp = "127.0.0.1:8000";
+    public static string httpFrom = "vintagestory";
     public static bool enableExtendedLog = false;
 
     public static void UpdateBaseConfigurations(ICoreAPI api)
@@ -108,13 +104,6 @@ public static class Configuration
                 else millisecondsPerTick = (int)(long)value;
             else PlayToEarnModSystem.Debug.Log("CONFIGURATION ERROR: millisecondsPerTick not set");
         }
-        { //earnByPlaying
-            if (baseConfigs.TryGetValue("earnByPlaying", out object value))
-                if (value is null) PlayToEarnModSystem.Debug.Log("CONFIGURATION ERROR: earnByPlaying is null");
-                else if (value is not bool) PlayToEarnModSystem.Debug.Log($"CONFIGURATION ERROR: earnByPlaying is not boolean is {value.GetType()}");
-                else earnByPlaying = (bool)value;
-            else PlayToEarnModSystem.Debug.Log("CONFIGURATION ERROR: earnByPlaying not set");
-        }
         { //coinsPerSecond
             if (baseConfigs.TryGetValue("coinsPerSecond", out object value))
                 if (value is null) PlayToEarnModSystem.Debug.Log("CONFIGURATION ERROR: coinsPerSecond is null");
@@ -124,40 +113,19 @@ public static class Configuration
                 else coinsPerSecond = new BigInteger((long)value);
             else PlayToEarnModSystem.Debug.Log("CONFIGURATION ERROR: coinsPerSecond not set");
         }
-        { //databaseName
-            if (baseConfigs.TryGetValue("databaseName", out object value))
-                if (value is null) PlayToEarnModSystem.Debug.Log("CONFIGURATION ERROR: databaseName is null");
-                else if (value is not string) PlayToEarnModSystem.Debug.Log($"CONFIGURATION ERROR: databaseName is not int is {value.GetType()}");
-                else databaseName = (string)value;
+        { //httpIp
+            if (baseConfigs.TryGetValue("httpIp", out object value))
+                if (value is null) PlayToEarnModSystem.Debug.Log("CONFIGURATION ERROR: httpIp is null");
+                else if (value is not string) PlayToEarnModSystem.Debug.Log($"CONFIGURATION ERROR: httpIp is not int is {value.GetType()}");
+                else httpIp = (string)value;
             else PlayToEarnModSystem.Debug.Log("CONFIGURATION ERROR: databaseName not set");
         }
-        { //databaseTable
-            if (baseConfigs.TryGetValue("databaseTable", out object value))
-                if (value is null) PlayToEarnModSystem.Debug.Log("CONFIGURATION ERROR: databaseTable is null");
-                else if (value is not string) PlayToEarnModSystem.Debug.Log($"CONFIGURATION ERROR: databaseTable is not int is {value.GetType()}");
-                else databaseTable = (string)value;
-            else PlayToEarnModSystem.Debug.Log("CONFIGURATION ERROR: databaseTable not set");
-        }
-        { //databaseUsername
-            if (baseConfigs.TryGetValue("databaseUsername", out object value))
-                if (value is null) PlayToEarnModSystem.Debug.Log("CONFIGURATION ERROR: databaseUsername is null");
-                else if (value is not string) PlayToEarnModSystem.Debug.Log($"CONFIGURATION ERROR: databaseUsername is not int is {value.GetType()}");
-                else databaseUsername = (string)value;
-            else PlayToEarnModSystem.Debug.Log("CONFIGURATION ERROR: databaseUsername not set");
-        }
-        { //databasePassword
-            if (baseConfigs.TryGetValue("databasePassword", out object value))
-                if (value is null) PlayToEarnModSystem.Debug.Log("CONFIGURATION ERROR: databasePassword is null");
-                else if (value is not string) PlayToEarnModSystem.Debug.Log($"CONFIGURATION ERROR: databasePassword is not int is {value.GetType()}");
-                else databasePassword = (string)value;
-            else PlayToEarnModSystem.Debug.Log("CONFIGURATION ERROR: databasePassword not set");
-        }
-        { //databaseAddress
-            if (baseConfigs.TryGetValue("databaseAddress", out object value))
-                if (value is null) PlayToEarnModSystem.Debug.Log("CONFIGURATION ERROR: databaseAddress is null");
-                else if (value is not string) PlayToEarnModSystem.Debug.Log($"CONFIGURATION ERROR: databaseAddress is not int is {value.GetType()}");
-                else databaseAddress = (string)value;
-            else PlayToEarnModSystem.Debug.Log("CONFIGURATION ERROR: databaseAddress not set");
+        { //httpFrom
+            if (baseConfigs.TryGetValue("httpFrom", out object value))
+                if (value is null) PlayToEarnModSystem.Debug.Log("CONFIGURATION ERROR: httpFrom is null");
+                else if (value is not string) PlayToEarnModSystem.Debug.Log($"CONFIGURATION ERROR: httpFrom is not int is {value.GetType()}");
+                else httpFrom = (string)value;
+            else PlayToEarnModSystem.Debug.Log("CONFIGURATION ERROR: httpFrom not set");
         }
         { //enableExtendedLog
             if (baseConfigs.TryGetValue("enableExtendedLog", out object value))
