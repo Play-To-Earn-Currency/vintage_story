@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Numerics;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Vintagestory.API.Common;
@@ -64,7 +65,7 @@ public partial class PlayToEarnModSystem : ModSystem
     {
         IServerPlayer player = args.Caller.Player as IServerPlayer;
         string statusText;
-        if (AFKModule.Modules.Events.playersSoftAfk.Contains(player.PlayerUID)) statusText = ", YOU ARE NOT EARNING PTE";
+        if (PlayerAFK(player)) statusText = ", YOU ARE NOT EARNING PTE";
         else statusText = ", Currently earning PTE";
 
         Task.Run(async () =>
@@ -144,8 +145,7 @@ public partial class PlayToEarnModSystem : ModSystem
                 // No players? nothing to do
                 if (onlinePlayers.Count == 0)
                 {
-                    if (Configuration.enableExtendedLog)
-                        Debug.Log("No players online...");
+                    Debug.LogDebug("No players online...");
                     lastTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                     return;
                 }
@@ -159,10 +159,9 @@ public partial class PlayToEarnModSystem : ModSystem
                 foreach (IServerPlayer player in onlinePlayers)
                 {
                     // Afk players
-                    if (AFKModule.Modules.Events.playersSoftAfk.Contains(player.PlayerUID))
+                    if (PlayerAFK(player))
                     {
-                        if (Configuration.enableExtendedLog)
-                            Debug.Log("Ignoring " + player.PlayerName + " because he is afk");
+                        Debug.LogDebug("Ignoring " + player.PlayerName + " because he is afk");
                         continue;
                     }
 
@@ -177,7 +176,7 @@ public partial class PlayToEarnModSystem : ModSystem
                                 uniqueid = player.PlayerUID,
                                 quantity = additionalCoins.ToString(),
                             };
-                            var json = System.Text.Json.JsonSerializer.Serialize(body);
+                            var json = JsonSerializer.Serialize(body);
                             var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
                             var response = await client.PutAsync($"http://{Configuration.httpIp}/increment", content);
                             response.EnsureSuccessStatusCode();
@@ -225,6 +224,20 @@ public partial class PlayToEarnModSystem : ModSystem
     }
     #endregion
 
+    #region utils
+    private static bool PlayerAFK(IServerPlayer byPlayer)
+    {
+        if (AFKModule.Modules.Events.ModulesSoftAFK.TryGetValue(byPlayer.PlayerUID, out List<string> modulesAFK))
+        {
+            if (modulesAFK.Contains("Moviment")) return true;
+            if (modulesAFK.Contains("Death")) return true;
+            if (modulesAFK.Contains("Camera")) return true;
+        }
+
+        return false;
+    }
+    #endregion
+
     public class Debug
     {
         static private ILogger logger;
@@ -232,20 +245,20 @@ public partial class PlayToEarnModSystem : ModSystem
         static public void LoadLogger(ILogger _logger) => logger = _logger;
         static public void Log(string message)
         {
-            logger?.Log(EnumLogType.Notification, $"[LevelUP] {message}");
+            logger?.Log(EnumLogType.Notification, $"[PlayToEarn] {message}");
         }
         static public void LogDebug(string message)
         {
             if (Configuration.enableExtendedLog)
-                logger?.Log(EnumLogType.Debug, $"[LevelUP] {message}");
+                logger?.Log(EnumLogType.Debug, $"[PlayToEarn] {message}");
         }
         static public void LogWarn(string message)
         {
-            logger?.Log(EnumLogType.Warning, $"[LevelUP] {message}");
+            logger?.Log(EnumLogType.Warning, $"[PlayToEarn] {message}");
         }
         static public void LogError(string message)
         {
-            logger?.Log(EnumLogType.Error, $"[LevelUP] {message}");
+            logger?.Log(EnumLogType.Error, $"[PlayToEarn] {message}");
         }
     }
 }
